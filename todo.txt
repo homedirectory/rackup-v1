@@ -1,0 +1,3 @@
+- append date to backup filename
+- handle sections (improve modularity)
+- encryption
