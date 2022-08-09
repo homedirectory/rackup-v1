@@ -5,12 +5,13 @@
          racket/promise)
 (require linea/line-macro)
 (require shell/pipeline)
+(require "helpers.rkt"
+         "macros.rkt"
+         "logging.rkt"
+         )
 
 (provide mk-backup f m in-dir)
-;(provide (all-defined-out))
-
-(define-syntax-rule (alias-proc alias-id proc-id)
-                    (define-syntax-rule (alias-id args (... ...)) (proc-id args (... ...))))
+(provide (all-defined-out))
 
 ; --- file structure ---
 ; for unix files/directories/symlinks
@@ -33,7 +34,7 @@
 (struct bak-file file (encrypt? temp?))
 ; bak-file constructor
 (define (mk-bak-file path-str #:encrypt [encrypt? #f] #:symlink [symlink? #f])
-  ;(printf "f ~a\n" path-str) 
+  (debug "mk-bak-file ~a" path-str) 
   (let* ([path (expand-user-path path-str)])
     ;(if (false? type) 
     ;(begin (printf "warn: ~a doesn't exist\n" path) '())
@@ -79,7 +80,7 @@
   ;{
   ;    gpg --batch --yes -c -o $(mktemp) (file-path afile)
   ;}
-  (displayln "WARN: encryption is not supported")
+  (warn "encryption is not supported")
   afile
   )
 
@@ -95,39 +96,46 @@
       (raise-user-error (format "ERROR: file already exists: ~a" path))
       )))
 
+; x : (or/c file? string?)
 (define (to-file x)
   (cond [(file? x) x]
-        [(string? x) (f x)]
-        [else (error (format "Unacceptable file candidate: ~e" x))]))
+        [(path-string? x) (mk-bak-file x)]
+        [else (error (format "to-file: Unacceptable file candidate: ~e" x))]))
 
-(define (to-file/list x)
-  (cond [(list? x) (map to-file (flatten x))]
-        [else (to-file x)]))
-
-; args : (or/c string? file?)
-(define (in-dir dir-path-str . args)
-  (map (lambda (x)
-         (set-file-path! x (build-path (expand-user-path dir-path-str) (file-path x)))
-         x)
-       ; flatten removes nulls
-       (to-file/list args)))
-
+(define-syntax-rule 
+  (in-dir dir-path args ...)
+  (in-dir-stream dir-path (stream args ...)))
+; args : (streamof string? file? (streamof ...))
+(define (in-dir-stream dir-path-str args)
+  (if (string-empty? dir-path-str)
+    args
+    (let ([path-prefix (expand-user-path dir-path-str)])
+      (stream-recmap (lambda (x)
+                       (cond [(file? x) 
+                              (set-file-path! 
+                                x 
+                                (build-path path-prefix (file-path x)))
+                              x]
+                             [(path-string? x) (build-path path-prefix x)]
+                             [else (error (format "in-dir: Unacceptable file candidate: ~e" x))]
+                             ))
+                     args))))
 
 ; --- main backup logic ---
 (define (simulate path files)
 
   (define (sim-process-file afile)
-    (if (not (can-read? afile))
-      (printf "WARN: can't read file: ~a\n" (file-path afile))
-      (cond [(bak-file-encrypt? afile) (printf "~a - encrypt\n" (file-path afile))]
-            [(mbf? afile) (printf "mbf: ~a\n" (build-path #{ mktemp -u } (file-path afile)))]
-            [else (printf "~a\n" (file-path afile))])))
+    (let ([fpath (file-path afile)])
+      (debug "Processing: ~a" fpath)
+      (if (not (can-read? afile))
+        (warn "can't read file: ~a" fpath)
+        (cond [(bak-file-encrypt? afile) (debug "~a - encrypt" fpath)]
+              [(mbf? afile) (debug "mbf: ~a" (build-path #{ mktemp -u } fpath))]
+              [else (debug "~a" fpath)]))))
 
-  {
-      echo -e "Simulating backup: $path\n"
-      (for-each sim-process-file files)
-      echo -e "\nDone"
-  }
+  (printf "Simulating backup: ~a\n\n" path)
+  (stream-rec-for-each sim-process-file files)
+  (printf "\nDone\n")
   )
 
 (define (archive path files)
@@ -137,12 +145,12 @@
           [else afile])
     )
   (define (archive-file afile)
-    (let ([afile-path (file-path afile)])
+    (let ([fpath (file-path afile)])
       ; order of cond predicates matters since we have a structure hierarchy
       (cond [(mbf? afile) 
-             { tar -C (path->string (mbf-tmp-dir-path afile)) -rPh -f (path->string path) (path->string afile-path) }]
+             { tar -C (path->string (mbf-tmp-dir-path afile)) -rPh -f (path->string path) (path->string fpath) }]
             [(bak-file? afile) 
-             { tar -rPh -f (path->string path) (path->string afile-path) }]
+             { tar -rPh -f (path->string path) (path->string fpath) }]
             )
       afile))
   (define (post-process-file afile)
@@ -154,33 +162,33 @@
           )
     afile)
 
+  (printf "Creating backup: ~a\n\n" path) 
+  { touch (path->string path) }
 
-    (printf "Creating backup: ~a\n" path)
-    {
-      touch (path->string path)
-    }
-  (for-each (lambda (afile)
-              (let* ([afile (pre-process-file afile)]
-                     [afile-path (file-path afile)])
-                (with-handlers 
-                  ([exn:fail? (lambda (e) 
-                                (printf "WARN: can't backup: ~a\n" afile-path))])
-                  (archive-file afile))
-                (post-process-file afile)))
-            files)
-  {
-    gzip -f (path->string path)
-    echo -e "\nBackup ready -> " (string-append (path->string path) ".gz")
-  }
+  (stream-rec-for-each 
+    (lambda (afile)
+      (let* ([afile (pre-process-file afile)]
+             [fpath (file-path afile)])
+        (with-handlers 
+          ([exn:fail? (lambda (e) 
+                        (warn "can't backup: ~a" fpath))])
+          (archive-file afile))
+        (info "archived: ~a" fpath)
+        (post-process-file afile)))
+    files)
+
+  { gzip -f (path->string path) }
+  (printf "\nBackup ready -> ~a\n" (string-append (path->string path) ".gz"))
   )
 
 (define-syntax mk-backup
   (syntax-rules ()
-    [(mk-backup bak-path args ...) (make-backup bak-path (stream args ...))]))
+    [(mk-backup bak-path args ...) 
+     (make-backup bak-path (stream args ...))]))
 
-; args : (streamof (or/c string? file? (listof args)))
+; args : (streamof path-string? file? (streamof ...))
 (define (args-stream->files args)
-  (flatten (stream->list (stream-map to-file/list args))))
+  (flatten (stream->list (stream-map to-file args))))
 
 ; args : (streamof (or/c string? file? (listof args)))
 (define (make-backup out-path-str args)
@@ -198,9 +206,9 @@
 
 
   (verify-path (out-path) (overwrite?))
-  (let ([files (args-stream->files args)])
-    (cond [(simulate?) (simulate (out-path) files)]
-          [else (archive (out-path) files)]))
+  (let ([files-stream (stream-recmap to-file args)])
+    (cond [(simulate?) (simulate (out-path) files-stream)]
+          [else (archive (out-path) files-stream)]))
   )
 
 
