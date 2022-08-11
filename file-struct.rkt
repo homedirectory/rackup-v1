@@ -25,11 +25,14 @@
 ; for files that are backed up
 (struct bak-file file (encrypt? temp?))
 ; bak-file constructor
-(define (mk-bak-file path/str #:encrypt [encrypt? #f])
+(define (mk-bak-file path/str #:encrypt? [encrypt? #f]
+                     #:temp? [temp? #f])
   ;(debug "mk-bak-file: ~a" path/str) 
   (let ([path (expand-user-path path/str)])
     (bak-file path encrypt? #f))
   )
+(define (bak-file-from-file fil)
+  (mk-bak-file (file-path fil)))
 
 ; --- mbf (mem-bak-file) structure ---
 ; for in-memory contents that need to be backed up
@@ -39,7 +42,8 @@
 ; mbf constructor
 ; data : promise?
 (define (mk-mbf name data)
-    (mbf (my-build-path "stdout" name) #f #t data))
+    (mbf (my-build-path (string-append "stdout_" (rand-string 10))
+                        name) #f #t data))
 
 (define (get-mbf-data obj)
   (force (mbf-data-delayed obj)))

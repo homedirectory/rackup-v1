@@ -2,7 +2,8 @@
 
 (require racket/stream racket/string racket/function racket/cmdline
          racket/promise)
-(require "helpers.rkt" "file-struct.rkt" "backup.rkt" "macros.rkt")
+(require "helpers.rkt" "file-struct.rkt" "backup.rkt" "macros.rkt"
+         "logging.rkt")
 
 (provide (all-defined-out))
 
@@ -14,10 +15,10 @@
 (define (in-dir-stream dir-path-str args)
   (let ([path-prefix 
           (if (string-empty? dir-path-str) "" (expand-user-path dir-path-str))])
-    (stream-norecmap 
+    (stream-map 
       (lambda (x)
-        ;(debug "~a: ~a" x (file-path x))
-        (cond [(file? x) 
+        (debug "in-dir: ~a" x)
+        (cond [(bak-file? x) 
                (set-file-path! 
                  x 
                  (my-build-path path-prefix (file-path x)))
@@ -25,9 +26,9 @@
               [(string? x) (mk-bak-file (my-build-path path-prefix x))]
               [else (error (format "in-dir: Unacceptable file candidate: ~e" x))]
               ))
-      (stream-norecfilter 
+      (stream-filter 
         (negate (lambda (x) (and (string? x) (string-empty? x))))
-        args))))
+        (stream-flatten args)))))
 
 (define-syntax-rule
   (files args ...) 
