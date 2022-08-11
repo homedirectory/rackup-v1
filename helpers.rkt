@@ -60,7 +60,7 @@
   (if val (f val) alt))
 
 (define (my-build-path base sub . subs)
-  (debug "my-build-path ~a ~a ~a" base sub subs)
+  ;(debug "my-build-path ~a ~a ~a" base sub subs)
   (let ([args (map 
                 (lambda (x) (if (string? x) (string->path x) x))
                 (filter 
@@ -81,3 +81,12 @@
     (list->string 
       (for/list ([i (in-range n)])
         (list-ref rand-string-char-list (random len))))))
+
+; path : path-string?
+; -> path? (that is equal to path)
+(define (mkdir path)
+  (make-directory path)
+  (if (string? path)
+    (string->path path)
+    path))
+

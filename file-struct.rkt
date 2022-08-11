@@ -1,6 +1,6 @@
 #lang rash
 
-(require racket/bool racket/promise)
+(require racket/bool racket/promise racket/string)
 (require "macros.rkt" "helpers.rkt" "logging.rkt")
 
 (provide (all-defined-out))
@@ -34,32 +34,29 @@
 (define (bak-file-from-file fil)
   (mk-bak-file (file-path fil)))
 
+(define (bak-file->string fil)
+  (format "{~a~a~a}" (path->string (file-path fil))
+          (if (bak-file-encrypt? fil) ",ENCRYPT" "")
+          (if (bak-file-temp? fil) ",TEMP" "")))
+
 ; --- mbf (mem-bak-file) structure ---
 ; for in-memory contents that need to be backed up
 ; tmp-dir-path : path?
-(struct mbf bak-file (data-delayed [tmp-dir-path #:mutable #:auto])
-        #:auto-value #f)
+(struct mbf bak-file (data-delayed))
 ; mbf constructor
 ; data : promise?
 (define (mk-mbf name data)
-    (mbf (my-build-path (string-append "stdout_" (rand-string 10))
-                        name) #f #t data))
+    (mbf name #f #t data))
 
-(define (get-mbf-data obj)
-  (force (mbf-data-delayed obj)))
+(define (get-mbf-data fil)
+  (force (mbf-data-delayed fil)))
 
-(define (get-mbf-full-path obj)
-  (my-build-path (mbf-tmp-dir-path obj) (file-path obj)))
-
-(define (touch-mbf obj)
-    (set-mbf-tmp-dir-path! obj (string->path #{ mktemp -d }))
-    (let ([mbf-full-path-string (path->string (get-mbf-full-path obj))])
-    {
-      mkdir -p #{dirname "$mbf-full-path-string"}
-      echo (get-mbf-data obj) &>! "$mbf-full-path-string"
-    }
-    obj
-    ))
+(define (touch-mbf fil)
+  {
+  echo (get-mbf-data fil) &>! (path->string (file-path fil))
+  }
+  fil
+  )
 
 
 ; --- general file procedures ---

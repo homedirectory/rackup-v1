@@ -1,23 +1,20 @@
 #lang rash
 
-(require racket/stream racket/string racket/function racket/cmdline
+(require racket/list racket/string racket/function racket/cmdline
          racket/promise)
 (require "helpers.rkt" "file-struct.rkt" "backup.rkt" "macros.rkt"
          "logging.rkt")
 
 (provide (all-defined-out))
 
-(define-syntax-rule 
-  (in-dir dir-path args ...)
-  (in-dir-stream dir-path (stream args ...)))
-; args : (streamof string? file? (streamof ...))
-; returns a stream of files with prefixed paths
-(define (in-dir-stream dir-path-str args)
+; args : (listof string? file? (listof ...))
+; returns a list of files with prefixed paths
+(define (in-dir dir-path-str . args)
   (let ([path-prefix 
           (if (string-empty? dir-path-str) "" (expand-user-path dir-path-str))])
-    (stream-map 
+    (map 
       (lambda (x)
-        (debug "in-dir: ~a" x)
+        ;(debug "in-dir: ~a" x)
         (cond [(bak-file? x) 
                (set-file-path! 
                  x 
@@ -26,13 +23,13 @@
               [(string? x) (mk-bak-file (my-build-path path-prefix x))]
               [else (error (format "in-dir: Unacceptable file candidate: ~e" x))]
               ))
-      (stream-filter 
+      (filter 
         (negate (lambda (x) (and (string? x) (string-empty? x))))
-        (stream-flatten args)))))
+        (flatten args)))))
 
 (define-syntax-rule
   (files args ...) 
-  (in-dir-stream "" (stream args ...)))
+  (in-dir "" args ...))
 
 ; macro alias for creating bak-file
 (alias-proc f mk-bak-file)
@@ -48,7 +45,7 @@
       (raise-user-error (format "ERROR: file already exists: ~a" path))
       )))
 
-; files : (streamof (or/c file? (streamof ...)))
+; files : (listof file?)
 (define (make-backup out-path-str 
                      #:overwrite? [overwrite? #f]
                      #:append-date? [append-date? #f] 

@@ -1,6 +1,7 @@
 - handle sections (improve modularity)
-- encryption: collect all files that should be encrypted into a single tar, encrypt it and put it into the main tar
 - make mktemp safe
+- real encryption
 
 
 x append date to backup filename
+x encryption: collect all files that should be encrypted into a single tar, encrypt it and put it into the main tar
