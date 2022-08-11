@@ -1,3 +1,5 @@
-- append date to backup filename
 - handle sections (improve modularity)
 - encryption: collect all files that should be encrypted into a single tar, encrypt it and put it into the main tar
+
+
+x append date to backup filename

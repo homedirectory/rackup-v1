@@ -11,7 +11,16 @@
   (test-suite
     "Tests for backup.rkt"
     (test-case 
-      "indir"
+      "in-dir simple"
+      (for-each
+        (lambda (expv actv)
+          (check-equal? (file-path expv) (file-path actv)))
+        (stream->list! 
+          (in-dir "/etc" "sudoers"))
+        (list (f "/etc/sudoers"))
+        ))
+    (test-case 
+      "in-dir"
       (for-each
         (lambda (expv actv)
           (cond [(file? expv) (check-equal? (file-path expv) (file-path actv))]
@@ -20,7 +29,7 @@
           (in-dir "lvl1"
                   "a" (f "b")
                   (in-dir "lvl2" "y" (f "z"))))
-        (list (p "lvl1/a") (f "lvl1/b") (list (p "lvl1/lvl2/y") (f "lvl1/lvl2/z"))))
+        (list (f "lvl1/a") (f "lvl1/b") (list (f "lvl1/lvl2/y") (f "lvl1/lvl2/z"))))
       )
     ))
 
