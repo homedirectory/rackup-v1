@@ -54,6 +54,8 @@
   (define opt-simulate? (make-parameter #f))
   (define opt-out-path (make-parameter (string->path out-path-str)))
   (define opt-overwrite? (make-parameter overwrite?))
+  ;(define opt-print-sizes? (make-parameter #f)) ; useful with simulation
+  (define opt-print-files? (make-parameter #f)) ; useful for piping to other commands
   (command-line 
     #:once-each
     [("-s" "--simulate") "Don't create any files"
@@ -61,23 +63,31 @@
     [("-o" "--output") --output "Output file (takes precedence over the defined one)"
                        (opt-out-path (string->path --output))]
     [("--overwrite") "Overwrite output file if it exists"
-                     (opt-overwrite? #t)])
+                     (opt-overwrite? #t)]
+    ;[("--print-sizes") "Print size for each file (useful when simulating)"
+    ;                (opt-print-sizes? #t)]
+    [("--print-files") "Simply print a list of files to be backed up (useful for piping with other commands)"
+                       (opt-print-files? #t)])
 
-  (let* ([append-date? (or append-date?
-                           (not (string-empty? date-format)))]
-         [date-format (if (string-empty? date-format)
-                        "%Y-%m-%d_%H:%M:%S"
-                        date-format)]
-         [out-path (if append-date?
-                     (path-replace-extension 
-                       (opt-out-path) 
-                       (string-append "_" 
-                                      #{date (string-append "+" date-format)} 
-                                      (val-or (my-path-get-extension (opt-out-path)) "")))
-                     (opt-out-path))])
-    (verify-path out-path (opt-overwrite?))
-    (cond [(opt-simulate?) (simulate out-path files)]
-          [else (archive out-path files)]))
+  (if (opt-print-files?)
+    (for-each (lambda (x) (displayln (file-path x)))
+              ; filter mbf's, since they are non-existent files
+              (filter (negate mbf?) files))
+    (let* ([append-date? (or append-date?
+                             (not (string-empty? date-format)))]
+           [date-format (if (string-empty? date-format)
+                          "%Y-%m-%d_%Hh%Mm%Ss"
+                          date-format)]
+           [out-path (if append-date?
+                       (path-replace-extension 
+                         (opt-out-path) 
+                         (string-append "_" 
+                                        #{date (string-append "+" date-format)} 
+                                        (val-or (my-path-get-extension (opt-out-path)) "")))
+                       (opt-out-path))])
+      (verify-path out-path (opt-overwrite?))
+      (cond [(opt-simulate?) (simulate out-path files)]
+            [else (mk-backup out-path files)])))
   )
 
 

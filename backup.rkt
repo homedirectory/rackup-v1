@@ -21,7 +21,7 @@
       ;(debug "Processing: ~a" fpath)
       (if (not (can-read? fil))
         (warn "can't read file: ~a" fpath)
-        #t
+        (begin (info "archived: ~a" fpath) #t)
         ;(cond [(bak-file-encrypt? fil) (debug "~a - encrypt" fpath)]
         ;      [else (debug "~a" fpath)])
         )))
@@ -42,7 +42,8 @@
 ; path: path?
 ; files: (listof file?)
 ; -> (or/c file? #f)
-(define (archive path files)
+; returns #f if no files were given
+(define (mk-backup path files)
   ; path1 : path?
   ; files1 : (listof file?)
   ; -> (or/c file? #f)
@@ -65,38 +66,39 @@
       fil)
     ; --- END internal definitions ---
 
-    ; archive files into tar
-    (for-each 
-      (lambda (fil)
-        (let* ([fil (pre-process-file fil)]
-               [fpath (file-path fil)])
-          (with-handlers 
-            ([exn:fail? (lambda (e) 
-                          (warn "can't backup: ~a" fpath))])
-            (archive-file fil)
-            (info "archived: ~a" fpath))
-          (post-process-file fil)))
-      files1)
-    ; gzip tar
-    (with-handlers ([exn:fail (lambda (e) (warn e) #f)])
-      { gzip -f (path->string path1) }
-      (file (path-add-extension path1 ".gz" ".")))
-    )
+    (if (empty? files1)
+      #f
+      (begin
+        ; archive files into tar
+        (for-each 
+          (lambda (fil)
+            (let* ([fil (pre-process-file fil)]
+                   [fpath (file-path fil)])
+              (with-handlers 
+                ([exn:fail? (lambda (e) 
+                              (warn "can't backup: ~a" fpath))])
+                (archive-file fil)
+                (info "archived: ~a" fpath))
+              (post-process-file fil)))
+          files1)
+        (file path1))))
 
   (printf "Creating backup: ~a\n\n" path) 
   ;{ touch (path->string path) } ; tar -rf will create a tar file if it doesn't exist yet
 
-  ; we want to store all mbf's nicely in one directory, so create a temporary one for that
+  ; we want to store all mbf's nicely in one directory, so prepare (dry run) a temporary one for that
   (let* ([mbf-tmp-dir (mkdir (string-append #{mktemp -u} "_stdout"))] 
          [files (map (lambda (x)
                        (when (mbf? x) 
                          (set-file-path! x (my-build-path mbf-tmp-dir (file-path x))))
-                         x)
-                       files)])
+                       x)
+                     files)])
     (debug "files:\n~a" (string-join (map bak-file->string files) "\n"))
     (let* ([files-to-encrypt (filter bak-file-encrypt? files)]
            [archive-encrypted 
-             ; 1. archive files to be encrypted in a single tar.gz
+             ; 1. archive files to be encrypted in a single tar
+             ; no need to compress, since encryption does it
+             ; archive-files returns #f if no files were given
              (let ([archive-to-be-encrypted 
                      (archive-files (string->path (string-append #{mktemp -u} "_encrypted"))
                                     files-to-encrypt)])
@@ -107,7 +109,7 @@
                    (if res
                      (begin
                        ; remove the original archive
-                       ;#{rm -f (file-path archive-to-be-encrypted)}
+                       #{rm -f (file-path archive-to-be-encrypted)}
                        ; mark the encrypted archive as a temporary file
                        (struct-copy bak-file (bak-file-from-file res) [temp? #t]))
                      #f))
@@ -117,11 +119,13 @@
       (when archive-encrypted
         (debug "encrypted archive: ~a" (file-path archive-encrypted)))
       ; 3. include the encrypted archive from 2. into the final backup
-      (archive-files path (if archive-encrypted
-                            (cons archive-encrypted files-rest)
-                            files-rest))
+      (let ([final-backup-file
+              (compress-file 
+                (archive-files path (if archive-encrypted
+                                      (cons archive-encrypted files-rest)
+                                      files-rest)))])
+        (newline)
+        (info "Backup ready -> ~a" (file-path final-backup-file)))
       ))
-
-  (printf "\nBackup ready -> ~a\n" (string-append (path->string path) ".gz"))
   )
 

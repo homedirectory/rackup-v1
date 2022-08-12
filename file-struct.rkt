@@ -59,13 +59,22 @@
   )
 
 
-; --- general file procedures ---
+; ----- general file procedures -----
+
+; fil : file?
+; -> file?
 (define (encrypt-file fil)
-  ;{
-  ;    gpg --batch --yes -c -o $(mktemp) (file-path fil)
-  ;}
-  (warn "encryption is not supported")
-  fil
-  )
+  ;(warn "encryption is not supported")
+  (let* ([path (file-path fil)]
+         [enc-path (path-add-extension path ".enc" ".")])
+    (with-handlers ([exn:fail (lambda (e) (warn e) #f)])
+      { gpg -c -o (path->string enc-path) (path->string path) }
+      (file enc-path))))
 
-
+; fil : file?
+; -> file?
+(define (compress-file fil)
+  (let ([path (file-path fil)])
+    (with-handlers ([exn:fail (lambda (e) (warn e) #f)])
+      { gzip -f (path->string path) }
+      (file (path-add-extension path ".gz" ".")))))
