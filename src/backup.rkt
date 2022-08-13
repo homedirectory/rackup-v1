@@ -2,7 +2,7 @@
 #lang rash
 
 (require racket/cmdline racket/list racket/string racket/bool
-         racket/promise racket/path racket/function)
+         racket/promise racket/path racket/function racket/system)
 (require linea/line-macro)
 (require shell/pipeline)
 (require "helpers.rkt"
@@ -14,30 +14,8 @@
 (provide (all-defined-out))
 
 
-; --- main backup logic ---
-(define (simulate path files)
-  (define (sim-process-file fil)
-    (let ([fpath (file-path fil)])
-      ;(debug "Processing: ~a" fpath)
-      (if (not (can-read? fil))
-        (warn "can't read file: ~a" fpath)
-        (begin (info "archived: ~a" fpath) #t)
-        ;(cond [(bak-file-encrypt? fil) (debug "~a - encrypt" fpath)]
-        ;      [else (debug "~a" fpath)])
-        )))
-
-  (printf "Simulating backup: ~a\n\n" path)
-  ; we want to store all mbf's nicely in one directory, so create a temporary one for that
-  (let* ([mbf-tmp-dir (string-append #{mktemp -u} "_stdout")] 
-         [files (map (lambda (x)
-                       (when (mbf? x) 
-                         (set-file-path! x (my-build-path mbf-tmp-dir (file-path x))))
-                         x)
-                       files)])
-    (debug "files:\n~a" (string-join (map bak-file->string files) "\n"))
-    (for-each sim-process-file files))
-  (printf "\nDone\n")
-  )
+; ---------------------------------------------------------
+; main backup logic 
 
 ; path: path?
 ; files: (listof file?)
@@ -56,9 +34,21 @@
     (define (archive-file fil)
       (let ([fpath (file-path fil)])
         ; order of cond predicates matters since we have a structure hierarchy
-        (cond [(bak-file? fil) 
-               { tar -rPh -f (path->string path1) (path->string fpath) }]
-              )
+        (cond 
+          ; bak-dir must have exclude? #t if it's here
+          ; so it requires special handling
+          [(bak-dir? fil)
+           ; how to do --option=(RACKET EXPRESION) in rash, so it doesn't insert a space after =
+           ; don't use rash here, but racket/system
+           (system (format "tar --exclude={~a,} -rPhv -f ~s ~s"
+                           (my-string-join 
+                             (map (lambda (x) (format "~s" x))
+                                  (bak-dir-files fil)) 
+                             ",")
+                           (path->string path1) 
+                           (path->string fpath)))]
+          [(bak-file? fil) 
+           { tar -rPh -f (path->string path1) (path->string fpath) }])
         fil))
     (define (post-process-file fil)
       (cond [(bak-file-temp? fil) 
@@ -81,10 +71,10 @@
                 (info "archived: ~a" fpath))
               (post-process-file fil)))
           files1)
-        (file path1))))
+        (file path1)))
+    )
 
-  (printf "Creating backup: ~a\n\n" path) 
-  ;{ touch (path->string path) } ; tar -rf will create a tar file if it doesn't exist yet
+  (info "Creating backup: ~a\n\n" path) 
 
   ; we want to store all mbf's nicely in one directory, so prepare (dry run) a temporary one for that
   (let* ([mbf-tmp-dir (mkdir (string-append #{mktemp -u} "_stdout"))] 
@@ -93,7 +83,7 @@
                          (set-file-path! x (my-build-path mbf-tmp-dir (file-path x))))
                        x)
                      files)])
-    (debug "files:\n~a" (string-join (map bak-file->string files) "\n"))
+    ;(debug "files:\n~a" (string-join (map bak-file->string files) "\n"))
     (let* ([files-to-encrypt (filter bak-file-encrypt? files)]
            [archive-encrypted 
              ; 1. archive files to be encrypted in a single tar
@@ -117,7 +107,7 @@
                )]
            [files-rest (filter (negate bak-file-encrypt?) files)])
       (when archive-encrypted
-        (debug "encrypted archive: ~a" (file-path archive-encrypted)))
+        (debug "encrypted: ~a" (file-path archive-encrypted)))
       ; 3. include the encrypted archive from 2. into the final backup
       (let ([final-backup-file
               (compress-file 
@@ -125,7 +115,44 @@
                                       (cons archive-encrypted files-rest)
                                       files-rest)))])
         (newline)
-        (info "Backup ready -> ~a" (file-path final-backup-file)))
+        (info "Backup ready -> [~a] ~a" 
+              #{du -sh (path->string (file-path final-backup-file)) \| cut -f1} 
+              (file-path final-backup-file)))
       ))
+  )
+
+(define (simulate path files)
+  (define (sim-process-file fil)
+    (let ([fpath (file-path fil)])
+      ;(debug "Processing: ~a" fpath)
+      (if (not (can-read? fil))
+        (warn "can't read file: ~a" fpath)
+        (begin 
+          (cond [(bak-dir? fil)
+                 (debug (format "tar --exclude={~a,} -rPhv -f ~s ~s"
+                                (my-string-join 
+                                  (map (lambda (x) (format "~s" x))
+                                       (bak-dir-files fil)) 
+                                  ",")
+                                (path->string path) 
+                                (path->string fpath)))]
+                [(bak-file? fil) 
+                 (debug "tar -rPh -f ~s ~s" (path->string path) (path->string fpath))])
+          #t)
+        ;(cond [(bak-file-encrypt? fil) (debug "~a - encrypt" fpath)]
+        ;      [else (debug "~a" fpath)])
+        )))
+
+  (printf "Simulating backup: ~a\n\n" path)
+  ; we want to store all mbf's nicely in one directory, so create a temporary one for that
+  (let* ([mbf-tmp-dir (string-append #{mktemp -u} "_stdout")] 
+         [files (map (lambda (x)
+                       (when (mbf? x) 
+                         (set-file-path! x (my-build-path mbf-tmp-dir (file-path x))))
+                         x)
+                       files)])
+    (debug "files:\n~a" (string-join (map bak-file->string files) "\n"))
+    (for-each sim-process-file files))
+  (printf "\nDone\n")
   )
 

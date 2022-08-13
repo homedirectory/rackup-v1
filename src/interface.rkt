@@ -9,27 +9,21 @@
 
 ; args : (listof string? file? (listof ...))
 ; returns a list of files with prefixed paths
-(define (in-dir dir-path-str . args)
-  (let ([path-prefix 
-          (if (string-empty? dir-path-str) "" (expand-user-path dir-path-str))])
-    (map 
-      (lambda (x)
-        ;(debug "in-dir: ~a" x)
-        (cond [(bak-file? x) 
-               (set-file-path! 
-                 x 
-                 (my-build-path path-prefix (file-path x)))
-               x]
-              [(string? x) (mk-bak-file (my-build-path path-prefix x))]
-              [else (error (format "in-dir: Unacceptable file candidate: ~e" x))]
-              ))
-      (filter 
-        (negate (lambda (x) (and (string? x) (string-empty? x))))
-        (flatten args)))))
+; if exclude? = #t, then return a bak-dir struct object that excludes args
+;   and args = (listof string?)
+(define (in-dir dir-path-str #:exclude? [exclude? #f] #:encrypt? [encrypt? #f] . args)
+  ; pre-process args 
+  (let ([args (filter 
+                (negate (lambda (x) (and (string? x) (string-blank? x))))
+                (flatten args))])
+    (mk-bak-dir dir-path-str #:exclude? exclude? #:encrypt? encrypt? args)))
 
 (define-syntax-rule
   (files args ...) 
-  (in-dir "" args ...))
+  (bak-dir->list (in-dir "" args ...)))
+
+; TODO globs
+;(define (glob str))
 
 ; macro alias for creating bak-file
 (alias-proc f mk-bak-file)
@@ -74,8 +68,8 @@
               ; filter mbf's, since they are non-existent files
               (filter (negate mbf?) files))
     (let* ([append-date? (or append-date?
-                             (not (string-empty? date-format)))]
-           [date-format (if (string-empty? date-format)
+                             (not (string-blank? date-format)))]
+           [date-format (if (string-blank? date-format)
                           "%Y-%m-%d_%Hh%Mm%Ss"
                           date-format)]
            [out-path (if append-date?
@@ -85,9 +79,12 @@
                                         #{date (string-append "+" date-format)} 
                                         (val-or (my-path-get-extension (opt-out-path)) "")))
                        (opt-out-path))])
-      (verify-path out-path (opt-overwrite?))
-      (cond [(opt-simulate?) (simulate out-path files)]
-            [else (mk-backup out-path files)])))
+
+      (if (opt-simulate?) 
+        (simulate out-path files)
+        (begin 
+          (verify-path out-path (opt-overwrite?))
+          (mk-backup out-path files)))))
   )
 
 

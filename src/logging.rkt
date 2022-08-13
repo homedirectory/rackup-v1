@@ -8,7 +8,8 @@
   (create-styled-string text #:fg color #:bold? #t))
 
 (define (display-log lvl fmt args)
-  (displayln (format "[~a] ~a" lvl (apply format (cons fmt args))))
+  (display (format "[~a] " lvl))
+  (displayln (apply format (cons fmt args)))
   )
 
 (define-syntax debug

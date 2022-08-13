@@ -2,7 +2,7 @@
 
 (require rackunit rackunit/text-ui
          racket/stream racket/list)
-(require "../helpers.rkt")
+(require "../src/helpers.rkt")
 
 (define (double x) (* x 2))
 (define num 0)
