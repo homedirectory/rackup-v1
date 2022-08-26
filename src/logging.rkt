@@ -1,11 +1,24 @@
 #lang racket/base
 
-(require rash/prompt-helpers/string-style)
-
 (provide debug info warn)
 
+(define colors-table
+  #hash(("black" . 30)
+        ("red" . 31)
+        ("green" . 32)
+        ("yellow" . 33)
+        ("blue" . 34)
+        ("magenta" . 35)
+        ("cyan" . 36)
+        ("white" . 37)))
+
+(define (style-string text color #:bold? [bold? #f])
+  (let ((bold (if bold? "1;" ""))
+        (color-code (hash-ref colors-table color)))
+    (format "\033[~a~am~a\033[0m" bold color-code text)))
+
 (define (bold-color text color)
-  (create-styled-string text #:fg color #:bold? #t))
+  (style-string text color #:bold? #t))
 
 (define (display-log lvl fmt args)
   (display (format "[~a] " lvl))

@@ -1,5 +1,5 @@
 #!/usr/bin/env racket
-#lang rash
+#lang racket/base
 
 (require racket/cmdline racket/list racket/string racket/bool
          racket/promise racket/path racket/function racket/system)
@@ -38,8 +38,6 @@
           ; bak-dir must have exclude? #t if it's here
           ; so it requires special handling
           [(bak-dir? fil)
-           ; how to do --option=(RACKET EXPRESION) in rash, so it doesn't insert a space after =
-           ; don't use rash here, but racket/system
            (system (format "tar --exclude={~a,} -rPhv -f ~s ~s"
                            (my-string-join 
                              (map (lambda (x) (format "~s" x))
@@ -48,11 +46,11 @@
                            (path->string path1) 
                            (path->string fpath)))]
           [(bak-file? fil) 
-           { tar -rPh -f (path->string path1) (path->string fpath) }])
+           (system (format "tar -rPh -f ~s ~s" (path->string path1) (path->string fpath)))])
         fil))
     (define (post-process-file fil)
       (cond [(bak-file-temp? fil) 
-             { rm -r (path->string (file-path fil)) }])
+             (system (format "rm -rf ~s" (path->string (file-path fil))))])
       fil)
     ; --- END internal definitions ---
 
@@ -77,7 +75,7 @@
   (info "Creating backup: ~a\n\n" path) 
 
   ; we want to store all mbf's nicely in one directory, so prepare (dry run) a temporary one for that
-  (let* ([mbf-tmp-dir (mkdir (string-append #{mktemp -u} "_stdout"))] 
+  (let* ([mbf-tmp-dir (mkdir (string-append (path->string (mktemp-path)) "_stdout"))] 
          [files (map (lambda (x)
                        (when (mbf? x) 
                          (set-file-path! x (my-build-path mbf-tmp-dir (file-path x))))
@@ -90,7 +88,7 @@
              ; no need to compress, since encryption does it
              ; archive-files returns #f if no files were given
              (let ([archive-to-be-encrypted 
-                     (archive-files (string->path (string-append #{mktemp -u} "_encrypted"))
+                     (archive-files (string->path (string-append (path->string (mktemp-path)) "_encrypted"))
                                     files-to-encrypt)])
                (if archive-to-be-encrypted
                  ; 2. encrypt the archive from 1.
@@ -99,7 +97,7 @@
                    (if res
                      (begin
                        ; remove the original archive
-                       #{rm -f (file-path archive-to-be-encrypted)}
+                       (system (format "rm -f ~s" (file-path archive-to-be-encrypted)))
                        ; mark the encrypted archive as a temporary file
                        (struct-copy bak-file (bak-file-from-file res) [temp? #t]))
                      #f))
@@ -116,7 +114,7 @@
                                       files-rest)))])
         (newline)
         (info "Backup ready -> [~a] ~a" 
-              #{du -sh (path->string (file-path final-backup-file)) \| cut -f1} 
+              (file-size-string (file-path final-backup-file))
               (file-path final-backup-file)))
       ))
   )
@@ -145,7 +143,7 @@
 
   (printf "Simulating backup: ~a\n\n" path)
   ; we want to store all mbf's nicely in one directory, so create a temporary one for that
-  (let* ([mbf-tmp-dir (string-append #{mktemp -u} "_stdout")] 
+  (let* ([mbf-tmp-dir (string-append (path->string (mktemp-path)) "_stdout")] 
          [files (map (lambda (x)
                        (when (mbf? x) 
                          (set-file-path! x (my-build-path mbf-tmp-dir (file-path x))))

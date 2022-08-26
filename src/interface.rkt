@@ -1,7 +1,7 @@
-#lang rash
+#lang racket/base
 
 (require racket/list racket/string racket/function racket/cmdline
-         racket/promise)
+         racket/promise racket/system)
 (require "helpers.rkt" "file-struct.rkt" "backup.rkt" "macros.rkt"
          "logging.rkt")
 
@@ -35,7 +35,7 @@
 (define (verify-path path overwrite?)
   (when (file/dir-exists? path)
     (if overwrite? 
-      { rm -rf (path->string path) }
+      (system (format "rm -rf ~s" (path->string path)))
       (raise-user-error (format "ERROR: file already exists: ~a" path))
       )))
 
@@ -76,7 +76,7 @@
                        (path-replace-extension 
                          (opt-out-path) 
                          (string-append "_" 
-                                        #{date (string-append "+" date-format)} 
+                                        (system (format "date ~a" (fix-date-cmd-arg date-format)))
                                         (val-or (my-path-get-extension (opt-out-path)) "")))
                        (opt-out-path))])
 

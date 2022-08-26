@@ -1,6 +1,6 @@
-#lang rash
+#lang racket/base
 
-(require racket/bool racket/promise racket/string)
+(require racket/bool racket/promise racket/string racket/file racket/system)
 (require "macros.rkt" "helpers.rkt" "logging.rkt")
 
 (provide (all-defined-out))
@@ -112,11 +112,8 @@
   (force (mbf-data-delayed fil)))
 
 (define (touch-mbf fil)
-  {
-  echo (get-mbf-data fil) &>! (path->string (file-path fil))
-  }
-  fil
-  )
+  (display-to-file (get-mbf-data fil) (file-path fil))
+  fil)
 
 
 ; ------------------------------------------------------------
@@ -129,7 +126,7 @@
   (let* ([path (file-path fil)]
          [enc-path (path-add-extension path ".enc" ".")])
     (with-handlers ([exn:fail (lambda (e) (warn e) #f)])
-      { gpg -c -o (path->string enc-path) (path->string path) }
+      (system (format "gpg -c -o ~s ~s" (path->string enc-path) (path->string path)))
       (file enc-path))))
 
 ; fil : file?
@@ -137,5 +134,5 @@
 (define (compress-file fil)
   (let ([path (file-path fil)])
     (with-handlers ([exn:fail (lambda (e) (warn e) #f)])
-      { gzip -f (path->string path) }
+      (system (format "gzip -f ~s" (path->string path)))
       (file (path-add-extension path ".gz" ".")))))

@@ -74,3 +74,22 @@
       (for/list ([i (in-range n)])
         (list-ref rand-string-char-list (random len))))))
 
+(define (mktemp-path)
+  (string->path (string-append "/tmp/tmp." (rand-string 10))))
+
+(define fs-strings (vector-immutable "<1k" "k" "M" "G"))
+(define (file-size-string path-string)
+  (let* ((size-bytes (file-size path-string))
+         (vec-ind (min 
+                    (inexact->exact (floor (log size-bytes 1024)))
+                    (- (vector-length fs-strings) 1))))
+    (if (= 0 vec-ind)
+      "<1k"
+      (format "~a~a" 
+              (quotient size-bytes (expt 1024 vec-ind)) 
+              (vector-ref fs-strings vec-ind)))))
+
+(define (fix-date-cmd-arg arg)
+  (if (string-prefix? arg "+") 
+    arg 
+    (string-append "+" arg)))
