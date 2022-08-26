@@ -1,7 +1,6 @@
 #lang racket/base
 
-(require racket/function racket/string
-         racket/path racket/list)
+(require racket/function racket/string racket/path racket/list)
 (require "logging.rkt")
 
 (provide (all-defined-out))

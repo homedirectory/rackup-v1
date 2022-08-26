@@ -1,9 +1,9 @@
 #lang racket
 
 (require rackunit rackunit/text-ui)
-(require "../src/helpers.rkt"
-         "../src/file-struct.rkt"
-         "../src/interface.rkt"
+(require "../rackup/helpers.rkt"
+         "../rackup/file-struct.rkt"
+         "../rackup/interface.rkt"
          )
 
 (define (p str) (string->path str))

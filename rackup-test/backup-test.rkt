@@ -1,10 +1,10 @@
 #lang racket
 
 (require rackunit rackunit/text-ui)
-(require "../src/backup.rkt"
-         "../src/helpers.rkt"
-         "../src/file-struct.rkt"
-         "../src/interface.rkt"
+(require "../rackup/backup.rkt"
+         "../rackup/helpers.rkt"
+         "../rackup/file-struct.rkt"
+         "../rackup/interface.rkt"
          )
 
 (define backup-tests 

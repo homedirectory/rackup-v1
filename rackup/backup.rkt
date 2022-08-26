@@ -3,13 +3,7 @@
 
 (require racket/cmdline racket/list racket/string racket/bool
          racket/promise racket/path racket/function racket/system)
-(require linea/line-macro)
-(require shell/pipeline)
-(require "helpers.rkt"
-         "macros.rkt"
-         "logging.rkt"
-         "file-struct.rkt"
-         )
+(require "helpers.rkt" "macros.rkt" "logging.rkt" "file-struct.rkt")
 
 (provide (all-defined-out))
 
