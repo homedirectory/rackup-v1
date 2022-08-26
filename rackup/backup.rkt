@@ -25,23 +25,27 @@
       (cond [(mbf? fil) (touch-mbf fil)]
             [else fil])
       )
+    ; -> boolean?
     (define (archive-file fil)
-      (let ([fpath (file-path fil)])
-        ; order of cond predicates matters since we have a structure hierarchy
-        (cond 
-          ; bak-dir must have exclude? #t if it's here
-          ; so it requires special handling
-          [(bak-dir? fil)
-           (system (format "tar --exclude={~a,} -rPhv -f ~s ~s"
-                           (my-string-join 
-                             (map (lambda (x) (format "~s" x))
-                                  (bak-dir-files fil)) 
-                             ",")
-                           (path->string path1) 
-                           (path->string fpath)))]
-          [(bak-file? fil) 
-           (system (format "tar -rPh -f ~s ~s" (path->string path1) (path->string fpath)))])
-        fil))
+      (let* ([fpath (file-path fil)]
+             ; order of cond predicates matters since we have a structure hierarchy
+             [success? 
+               (cond 
+                 ; bak-dir must have exclude? #t if it's here
+                 ; so it requires special handling
+                 [(bak-dir? fil)
+                  (system (format "tar --exclude={~a,} -rPhv -f ~s ~s"
+                                  (my-string-join 
+                                    (map (lambda (x) (format "~s" x))
+                                         (bak-dir-files fil)) 
+                                    ",")
+                                  (path->string path1) 
+                                  (path->string fpath)))]
+                 [(bak-file? fil) 
+                  (system (format "tar -rPh -f ~s ~s" 
+                                  (path->string path1) 
+                                  (path->string fpath)))])])
+        (if success? fil #f)))
     (define (post-process-file fil)
       (cond [(bak-file-temp? fil) 
              (system (format "rm -rf ~s" (path->string (file-path fil))))])
@@ -56,11 +60,9 @@
           (lambda (fil)
             (let* ([fil (pre-process-file fil)]
                    [fpath (file-path fil)])
-              (with-handlers 
-                ([exn:fail? (lambda (e) 
-                              (warn "can't backup: ~a" fpath))])
-                (archive-file fil)
-                (info "archived: ~a" fpath))
+              (if (archive-file fil)
+                (info "archived: ~a" fpath)
+                (warn "can't backup: ~a" fpath))
               (post-process-file fil)))
           files1)
         (file path1)))
@@ -82,8 +84,11 @@
              ; no need to compress, since encryption does it
              ; archive-files returns #f if no files were given
              (let ([archive-to-be-encrypted 
-                     (archive-files (string->path (string-append (path->string (mktemp-path)) "_encrypted"))
-                                    files-to-encrypt)])
+                     (archive-files 
+                       (string->path 
+                         (string-append (path->string (mktemp-path))
+                                        "_encrypted"))
+                       files-to-encrypt)])
                (if archive-to-be-encrypted
                  ; 2. encrypt the archive from 1.
                  ; res : file?
