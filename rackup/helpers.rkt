@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require racket/function racket/string racket/path racket/list)
+(require racket/function racket/string racket/path racket/list racket/port)
 (require "logging.rkt")
 
 (provide (all-defined-out))
@@ -92,3 +92,15 @@
   (if (string-prefix? arg "+") 
     arg 
     (string-append "+" arg)))
+
+; runs cmd with args and returns stdout
+; -> string?
+(define (run-cmd cmd . args)
+  (let-values ([(sp out in err)
+                (apply subprocess (append (list #f #f #f (find-executable-path cmd)) args))])
+    (subprocess-wait sp)
+    (let ((result (port->string out)))
+      (close-input-port out)
+      (close-output-port in)
+      (close-input-port err)
+      (string-trim result "\n" #:left? #f))))

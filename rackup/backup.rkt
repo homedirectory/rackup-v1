@@ -120,16 +120,16 @@
       (if (not (can-read? fil))
         (warn "can't read file: ~a" fpath)
         (begin 
-          (cond [(bak-dir? fil)
-                 (debug (format "tar --exclude={~a,} -rPhv -f ~s ~s"
-                                (my-string-join 
-                                  (map (lambda (x) (format "~s" x))
-                                       (bak-dir-files fil)) 
-                                  ",")
-                                (path->string path) 
-                                (path->string fpath)))]
-                [(bak-file? fil) 
-                 (debug "tar -rPh -f ~s ~s" (path->string path) (path->string fpath))])
+          ;(cond [(bak-dir? fil)
+          ;       (debug (format "tar --exclude={~a,} -rPhv -f ~s ~s"
+          ;                      (my-string-join 
+          ;                        (map (lambda (x) (format "~s" x))
+          ;                             (bak-dir-files fil)) 
+          ;                        ",")
+          ;                      (path->string path) 
+          ;                      (path->string fpath)))]
+          ;      [(bak-file? fil) 
+          ;       (debug "tar -rPh -f ~s ~s" (path->string path) (path->string fpath))])
           #t)
         ;(cond [(bak-file-encrypt? fil) (debug "~a - encrypt" fpath)]
         ;      [else (debug "~a" fpath)])

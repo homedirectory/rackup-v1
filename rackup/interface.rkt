@@ -76,7 +76,7 @@
                        (path-replace-extension 
                          (opt-out-path) 
                          (string-append "_" 
-                                        (system (format "date ~a" (fix-date-cmd-arg date-format)))
+                                        (run-cmd "date" (fix-date-cmd-arg date-format))
                                         (val-or (my-path-get-extension (opt-out-path)) "")))
                        (opt-out-path))])
 
