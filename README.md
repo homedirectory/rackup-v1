@@ -1,5 +1,5 @@
 ## Rackup
-A backup utility in Racket.
+A backup utility made with Racket.
 
 ### Usage
 Backup configurations are written as Racket programs that use `rackup` as a library dependency.
